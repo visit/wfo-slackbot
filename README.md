@@ -1,4 +1,4 @@
-# Working from Office Slack bot
+# Working from Office/Home (WFO/WFH) Slack bot
 
 A Slack bot that will keep track of your colleagues' remote working status.
 
