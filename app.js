@@ -104,6 +104,64 @@ const getHomeView = (user) => {
         }
       });
 
+    let date = new Date();
+    for (let i = 0; i < 7; i++) {
+      let dateKey = date.toISOString().substring(0, 10);
+      if (dateKey in _db.status.dates) {
+        let elements = [];
+
+        let wfo = [], wfh = [];
+        for (const [userKey, user] of Object.entries(_db.status.dates[dateKey].users)) {
+          if (userKey in office.users) {
+            if (user.status == 'wfo')
+              wfo.push(userKey);
+            else if (user.status == 'wfh')
+              wfh.push(userKey);
+          }
+        }
+
+        if (wfo.length > 0) {
+          elements.push(
+            {
+              type: 'plain_text',
+              text: ':office:'
+            },
+            {
+              type: 'mrkdwn',
+              text: wfo.map(x => `<@${x}>`).join('')
+            });
+        }
+
+        if (wfh.length > 0) {
+          elements.push(
+            {
+              type: 'plain_text',
+              text: ':house:'
+            },
+            {
+              type: 'mrkdwn',
+              text: wfh.map(x => `<@${x}>`).join('')
+            });
+        }
+
+        if (elements.length > 0) {
+          view.blocks.push(
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `*${i == 0 ? 'Today' : i == 1 ? 'Tomorrow' : dateKey}*`
+              }
+            },
+            {
+              type: 'context',
+              elements: elements
+            });
+        }
+      }
+      date.setDate(date.getDate() + 1);
+    }
+
     if (user in office.users) {
       view.blocks.push(
         {
@@ -113,7 +171,7 @@ const getHomeView = (user) => {
               type: 'button',
               text: {
                 type: 'plain_text',
-                text: 'Leave Office'
+                text: 'Leave office'
               },
               style: 'danger',
               action_id: 'leave_office',
@@ -131,7 +189,7 @@ const getHomeView = (user) => {
               type: 'button',
               text: {
                 type: 'plain_text',
-                text: 'Join Office'
+                text: 'Join office'
               },
               style: 'primary',
               action_id: 'join_office',
@@ -153,9 +211,9 @@ const getHomeView = (user) => {
           type: 'button',
           text: {
             type: 'plain_text',
-            text: 'New Office'
+            text: 'Add office'
           },
-          action_id: 'new_office'
+          action_id: 'add_office'
         }
       ]
     });
@@ -205,13 +263,13 @@ app.action('leave_office', async ({ ack, body, client, logger }) => {
   });
 });
 
-app.action('new_office', async ({ ack, body, client, logger }) => {
+app.action('add_office', async ({ ack, body, client, logger }) => {
   await ack();
 
   try {
     const result = await client.views.open({
       trigger_id: body.trigger_id,
-      view: getNewOfficeView(body.view.id)
+      view: getAddOfficeView(body.view.id)
     });
   }
   catch (error) {
@@ -219,15 +277,15 @@ app.action('new_office', async ({ ack, body, client, logger }) => {
   }
 });
 
-const getNewOfficeView = (view_id) => {
+const getAddOfficeView = (view_id) => {
   const view =
   {
     type: 'modal',
-    callback_id: 'new_office',
+    callback_id: 'add_office',
     private_metadata: view_id,
     title: {
       type: 'plain_text',
-      text: 'New office'
+      text: 'Add office'
     },
     blocks: [
       {
@@ -259,7 +317,7 @@ const getNewOfficeView = (view_id) => {
         type: 'input',
         label: {
           type: 'plain_text',
-          text: 'Post attendance in channel (optional)'
+          text: 'Post attendance in channel'
         },
         element: {
           type: 'channels_select',
@@ -280,7 +338,7 @@ const getNewOfficeView = (view_id) => {
   return view;
 };
 
-app.view('new_office', async ({ ack, body, view, client, logger }) => {
+app.view('add_office', async ({ ack, body, view, client, logger }) => {
   await ack();
 
   try {
@@ -431,9 +489,11 @@ app.command('/wfh', async ({ ack, body, client, respond, logger }) => {
 
 const setStatus = (date, user, status) => {
   if (!(date in _db.status.dates))
-    _db.status.dates[date] = {};
+    _db.status.dates[date] = {
+      users: {}
+    };
 
-  _db.status.dates[date][user] = {
+  _db.status.dates[date].users[user] = {
     status: status
   };
 };
