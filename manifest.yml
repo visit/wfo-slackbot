@@ -1,12 +1,14 @@
 display_information:
-  name: WFO bot
+  name: WFO status
+  description: Keeps track of your colleagues' WFO/WFH status.
+  background_color: "#3d0a0a"
 features:
   app_home:
     home_tab_enabled: true
     messages_tab_enabled: false
     messages_tab_read_only_enabled: true
   bot_user:
-    display_name: WFO bot
+    display_name: WFO status
     always_online: false
   shortcuts:
     - name: Working from office
