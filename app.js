@@ -11,7 +11,8 @@ const _dbPaths = {
 
 const _db = {
   config: {
-    offices: {}
+    offices: {},
+    users: {}
   },
   status: {
     dates: {}
@@ -120,16 +121,34 @@ const getHomeView = (user) => {
           }
         }
 
+        const addUserElements = (users) => {
+          for (let userKey of users) {
+            if (userKey in _db.config.users) {
+              let user = _db.config.users[userKey];
+              elements.push(
+                {
+                  type: 'image',
+                  image_url: user.imageUrl,
+                  alt_text: user.realName
+                });
+            }
+            else {
+              elements.push(
+                {
+                  type: 'mrkdwn',
+                  text: `<@${userKey}>`
+                });
+            }
+          }
+        };
+
         if (wfo.length > 0) {
           elements.push(
             {
               type: 'plain_text',
               text: ':office:'
-            },
-            {
-              type: 'mrkdwn',
-              text: wfo.map(x => `<@${x}>`).join('')
             });
+          addUserElements(wfo);
         }
 
         if (wfh.length > 0) {
@@ -137,11 +156,8 @@ const getHomeView = (user) => {
             {
               type: 'plain_text',
               text: ':house:'
-            },
-            {
-              type: 'mrkdwn',
-              text: wfh.map(x => `<@${x}>`).join('')
             });
+          addUserElements(wfh);
         }
 
         if (elements.length > 0) {
@@ -433,7 +449,7 @@ app.view('status', async ({ ack, body, view, client, logger }) => {
   try {
     const status = view.private_metadata;
     const date = view.state.values.date.date.selected_date;
-    setStatus(date, body.user.id, status);
+    await setStatus(client, date, body.user.id, status);
 
     /*await client.chat.postEphemeral({
       user: body.user.id,
@@ -448,10 +464,11 @@ app.view('status', async ({ ack, body, view, client, logger }) => {
 
 app.command('/wfo', async ({ ack, body, client, respond, logger }) => {
   await ack();
+
   try {
     let date = parseDate(body.text);
     if (date) {
-      setStatus(date, body.user_id, 'wfo');
+      await setStatus(client, date, body.user_id, 'wfo');
       await respond(`Set your status to working from office on ${date}`);
     }
     else {
@@ -472,7 +489,7 @@ app.command('/wfh', async ({ ack, body, client, respond, logger }) => {
   try {
     let date = parseDate(body.text);
     if (date) {
-      setStatus(date, body.user_id, 'wfh');
+      await setStatus(client, date, body.user_id, 'wfh');
       await respond(`Set your status to working from home on ${date}`);
     }
     else {
@@ -487,7 +504,19 @@ app.command('/wfh', async ({ ack, body, client, respond, logger }) => {
   }
 });
 
-const setStatus = (date, user, status) => {
+const setStatus = async (client, date, user, status) => {
+  if (!(user in _db.config.users)) {
+    const result = await client.users.info({
+      user: user
+    });
+
+    _db.config.users[user] = {
+      name: result.user.name,
+      realName: result.user.real_name,
+      imageUrl: result.user.profile.image_48
+    };
+  }
+
   if (!(date in _db.status.dates))
     _db.status.dates[date] = {
       users: {}
