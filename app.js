@@ -71,158 +71,42 @@ const getHomeView = (user) => {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: '*Welcome to the WFO bot home, <@' + user + '> :house: :office:*'
+          text: '*Welcome to the WFO status home, <@' + user + '> :house: :office:*'
         }
-      },
-      {
-        type: 'divider'
-      },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: '*Offices*'
-        }
-      },
-      {
-        type: 'divider'
       }
     ]
   };
 
+  let options = [];
+  let initialOption = undefined;
   for (const [key, office] of Object.entries(_db.config.offices)) {
-    view.blocks.push(
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: key
-        },
-        accessory: {
-          type: 'image',
-          image_url: office.imageUrl,
-          alt_text: ''
-        }
-      });
+    let option = {
+      text: {
+        type: 'plain_text',
+        text: key
+      },
+      value: key
+    };
+    options.push(option);
 
-    let date = new Date();
-    for (let i = 0; i < 7; i++) {
-      let dateKey = date.toISOString().substring(0, 10);
-      if (dateKey in _db.status.dates) {
-        let elements = [];
-
-        let wfo = [], wfh = [];
-        for (const [userKey, user] of Object.entries(_db.status.dates[dateKey].users)) {
-          if (userKey in office.users) {
-            if (user.status == 'wfo')
-              wfo.push(userKey);
-            else if (user.status == 'wfh')
-              wfh.push(userKey);
-          }
-        }
-
-        const addUserElements = (users) => {
-          for (let userKey of users) {
-            if (userKey in _db.config.users) {
-              let user = _db.config.users[userKey];
-              elements.push(
-                {
-                  type: 'image',
-                  image_url: user.imageUrl,
-                  alt_text: user.realName
-                });
-            }
-            else {
-              elements.push(
-                {
-                  type: 'mrkdwn',
-                  text: `<@${userKey}>`
-                });
-            }
-          }
-        };
-
-        if (wfo.length > 0) {
-          elements.push(
-            {
-              type: 'plain_text',
-              text: ':office:'
-            });
-          addUserElements(wfo);
-        }
-
-        if (wfh.length > 0) {
-          elements.push(
-            {
-              type: 'plain_text',
-              text: ':house:'
-            });
-          addUserElements(wfh);
-        }
-
-        if (elements.length > 0) {
-          view.blocks.push(
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: `*${i == 0 ? 'Today' : i == 1 ? 'Tomorrow' : dateKey}*`
-              }
-            },
-            {
-              type: 'context',
-              elements: elements
-            });
-        }
-      }
-      date.setDate(date.getDate() + 1);
-    }
-
-    if (user in office.users) {
-      view.blocks.push(
-        {
-          type: 'actions',
-          elements: [
-            {
-              type: 'button',
-              text: {
-                type: 'plain_text',
-                text: 'Leave office'
-              },
-              style: 'danger',
-              action_id: 'leave_office',
-              value: key
-            }
-          ]
-        });
-    }
-    else {
-      view.blocks.push(
-        {
-          type: 'actions',
-          elements: [
-            {
-              type: 'button',
-              text: {
-                type: 'plain_text',
-                text: 'Join office'
-              },
-              style: 'primary',
-              action_id: 'join_office',
-              value: key
-            }
-          ]
-        });
-    }
+    if (user in office.users)
+      initialOption = option;
   }
 
   view.blocks.push(
     {
-      type: 'divider'
-    },
-    {
       type: 'actions',
       elements: [
+        {
+          type: 'static_select',
+          placeholder: {
+            type: 'plain_text',
+            text: 'Choose your office'
+          },
+          action_id: 'join_office',
+          options: options,
+          initial_option: initialOption
+        },
         {
           type: 'button',
           text: {
@@ -233,6 +117,120 @@ const getHomeView = (user) => {
         }
       ]
     });
+
+  let office = Object.values(_db.config.offices).filter(x => user in x.users);
+  if (office.length > 0) {
+    office = office[0];
+
+    view.blocks.push(
+      {
+        type: 'divider'
+      });
+
+    let date = new Date();
+    for (let i = 0; i < 7; i++) {
+      let dateKey = date.toISOString().substring(0, 10);
+
+      let wfo = [], wfh = [];
+      if (dateKey in _db.status.dates) {
+        for (const [userKey, user] of Object.entries(_db.status.dates[dateKey].users)) {
+          if (userKey in office.users) {
+            if (user.status == 'wfo')
+              wfo.push(userKey);
+            else if (user.status == 'wfh')
+              wfh.push(userKey);
+          }
+        }
+      }
+
+      view.blocks.push(
+        {
+          type: 'header',
+          text: {
+            type: 'plain_text',
+            text: `${i == 0 ? 'Today' : i == 1 ? 'Tomorrow' : dateKey}`
+          }
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: ':office:'
+              },
+              style: wfo.includes(user) ? 'danger' : undefined,
+              action_id: wfo.includes(user) ? 'unset' : 'wfo',
+              value: dateKey
+            },
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: ':house:'
+              },
+              style: wfh.includes(user) ? 'danger' : undefined,
+              action_id: wfh.includes(user) ? 'unset' : 'wfh',
+              value: dateKey
+            }
+          ]
+        });
+
+      const addUserElements = (users, elements) => {
+        for (let userKey of users) {
+          if (userKey in _db.config.users) {
+            let u = _db.config.users[userKey];
+            elements.push(
+              {
+                type: 'image',
+                image_url: u.imageUrl,
+                alt_text: u.realName
+              });
+          }
+          else {
+            elements.push(
+              {
+                type: 'mrkdwn',
+                text: `<@${userKey}>`
+              });
+          }
+        }
+      };
+
+      if (wfo.length > 0) {
+        let elements = [];
+        elements.push(
+          {
+            type: 'plain_text',
+            text: ':office:'
+          });
+        addUserElements(wfo, elements);
+        view.blocks.push(
+          {
+            type: 'context',
+            elements: elements
+          });
+      }
+
+      if (wfh.length > 0) {
+        let elements = [];
+        elements.push(
+          {
+            type: 'plain_text',
+            text: ':house:'
+          });
+        addUserElements(wfh, elements);
+        view.blocks.push(
+          {
+            type: 'context',
+            elements: elements
+          });
+      }
+
+      date.setDate(date.getDate() + 1);
+    }
+  }
 
   return view;
 };
@@ -246,37 +244,20 @@ app.action('join_office', async ({ ack, body, client, logger }) => {
         delete office.users[body.user.id];
     };
 
-    let office = _db.config.offices[body.actions[0].value];
+    let office = _db.config.offices[body.actions[0].selected_option.value];
     office.users[body.user.id] = {
       name: body.user.name
     };
+
+    await client.views.update({
+      view_id: body.view.id,
+      hash: body.view.hash,
+      view: getHomeView(body.user.id)
+    });
   }
   catch (error) {
     logger.error(error);
   }
-
-  await client.views.update({
-    view_id: body.view.id,
-    view: getHomeView(body.user.id)
-  });
-});
-
-app.action('leave_office', async ({ ack, body, client, logger }) => {
-  await ack();
-
-  try {
-    let office = _db.config.offices[body.actions[0].value];
-    if (body.user.id in office.users)
-      delete office.users[body.user.id];
-  }
-  catch (error) {
-    logger.error(error);
-  }
-
-  await client.views.update({
-    view_id: body.view.id,
-    view: getHomeView(body.user.id)
-  });
 });
 
 app.action('add_office', async ({ ack, body, client, logger }) => {
@@ -378,13 +359,22 @@ app.view('add_office', async ({ ack, body, view, client, logger }) => {
   }
 });
 
-app.shortcut('wfo', async ({ ack, body, client, logger }) => {
+app.action({ action_id: /wfo|wfh|unset/ }, async ({ ack, body, client, logger }) => {
   await ack();
 
   try {
-    const result = await client.views.open({
-      trigger_id: body.trigger_id,
-      view: getStatusView('wfo')
+    const action = body.actions[0];
+    const status = action.action_id;
+    const date = action.value;
+    if (status == 'unset')
+      await unsetStatus(client, date, body.user.id);
+    else
+      await setStatus(client, date, body.user.id, status);
+
+    await client.views.update({
+      view_id: body.view.id,
+      hash: body.view.hash,
+      view: getHomeView(body.user.id)
     });
   }
   catch (error) {
@@ -392,13 +382,13 @@ app.shortcut('wfo', async ({ ack, body, client, logger }) => {
   }
 });
 
-app.shortcut('wfh', async ({ ack, body, client, logger }) => {
+app.shortcut({ callback_id: /wfo|wfh/ }, async ({ ack, body, client, logger }) => {
   await ack();
 
   try {
     const result = await client.views.open({
       trigger_id: body.trigger_id,
-      view: getStatusView('wfh')
+      view: getStatusView(body.callback_id)
     });
   }
   catch (error) {
@@ -524,6 +514,17 @@ const setStatus = async (client, date, user, status) => {
 
   _db.status.dates[date].users[user] = {
     status: status
+  };
+};
+
+const unsetStatus = async (client, date, user) => {
+  if (!(date in _db.status.dates))
+    _db.status.dates[date] = {
+      users: {}
+    };
+
+  if (date in _db.status.dates && user in _db.status.dates[date].users) {
+    delete _db.status.dates[date].users[user];
   };
 };
 
