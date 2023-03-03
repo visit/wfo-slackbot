@@ -4,7 +4,7 @@ A Slack bot that will keep track of your colleagues' remote working status.
 
 ## Features
 
-TBD
+Hackathon WIP project, TBD!
 
 ## Installation
 Create a Slack app, upload [manifest.yaml](manifest.yaml) for scopes.
